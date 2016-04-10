@@ -69,9 +69,13 @@ class Graph {
             string ret = "Graph:\n";
             for (auto it : this->vertices) {
                 ret += "  " + it.second->to_string() + ":";
-                ret += "\n    ";
+                ret += "\n    Out: ";
                 for (auto out: it.second->outgoing) {
                     ret += out.second->to_string() + ", ";
+                }
+                ret += "\n    In:  ";
+                for (auto in: it.second->incoming) {
+                    ret += in.second->to_string() + ", ";
                 }
                 ret += "\n";
             }
