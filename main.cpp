@@ -66,12 +66,15 @@ class Graph {
             this->vertices = vert;
         }
         string to_string() const {
-            string ret = "Graph(";
-            for (auto it = this->vertices.begin(); it != this->vertices.end(); ) {
-                ret += it->second->to_string();
-                ret += (++it == this->vertices.end() ? "" : ", ");
+            string ret = "Graph:\n";
+            for (auto it : this->vertices) {
+                ret += "  " + it.second->to_string() + ":";
+                ret += "\n    ";
+                for (auto out: it.second->outgoing) {
+                    ret += out.second->to_string() + ", ";
+                }
+                ret += "\n";
             }
-            ret += ")";
             return ret;
         }
         Graph copy() {
@@ -135,31 +138,51 @@ vector<Vertex*> rev_top_sort(Graph g) {
     g.vertices.erase(to_remove->id);
     sorted = rev_top_sort(g);
     sorted.push_back(to_remove);
-//    
-//    // Rollback changes to graph
-//    g.vertices[to_remove.id] = (to_remove);
-//    for (auto it : to_remove.outgoing) {
-//        it.second.incoming[to_remove.id] = to_remove;
-//    }
-//    for (auto it : to_remove.incoming) {
-//        it.second.outgoing[to_remove.id] = to_remove;
-//    }
+    
+    // Rollback changes to graph
+    g.vertices[to_remove->id] = to_remove;
+    for (auto it : to_remove->outgoing) {
+        it.second->incoming[to_remove->id] = to_remove;
+    }
+    for (auto it : to_remove->incoming) {
+        it.second->outgoing[to_remove->id] = to_remove;
+    }
 
     return sorted;
 }
 
-Vertex* copy_subtree(Vertex* root) {
-    Vertex* new_root = new Vertex(root->type, root->id);
-
+Vertex* copy_subtree(Graph &g, Vertex* root) {
+    Vertex* new_root = new Vertex(root->type);
+    
     for (auto it : root->outgoing) {
         Vertex* child = it.second;
-        Vertex* new_child = copy_subtree(child);
+        Vertex* new_child = copy_subtree(g, child);
         new_root->outgoing[new_child->id] = new_child;
         new_child->incoming[new_root->id] = new_root;
     }
-
+    cout << "Adding " << (*new_root) << endl;
+    g.vertices[new_root->id] = new_root;
     return new_root;
 }
+
+Graph normalize(Graph g) {
+    Graph graph = g.copy();
+    vector <Vertex*> sorted = rev_top_sort(graph);
+    for (Vertex* vertex : sorted) {
+        cout << (*vertex) << " has " << vertex->incoming.size() << endl; 
+        if (vertex->incoming.size() > 1) {
+            for (map<long long, Vertex*>::iterator it = vertex->incoming.begin(); ++it != vertex->incoming.end(); ) {
+                Vertex* parent = it->second;
+                Vertex* new_subtree = copy_subtree(graph, vertex);
+                new_subtree->incoming[parent->id] = parent;
+                parent->outgoing.erase(vertex->id);
+                parent->outgoing[new_subtree->id] = new_subtree;
+            }
+        }
+    }
+    return graph;
+}
+
 
 int main(int argc, char** argv) {
     
@@ -213,5 +236,8 @@ int main(int argc, char** argv) {
     for (Vertex* v : sorted) cout << (*v) << ", ";
     cout << endl;
 
+    cout << "Normalized: " << endl;
+    cout << normalize(graph) << endl;
+    
     return 0;
 }
