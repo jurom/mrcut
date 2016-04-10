@@ -215,17 +215,28 @@ Graph normalize(Graph g) {
     return graph;
 }
 
-double _cut_normalized_subtree(Vertex* root, map<Vertex*, double> &flows) {
-    if (root->outgoing.size() == 0) return INFINITY;
+pair<double, vector<Vertex*>> _cut_normalized_subtree(Vertex* root, map<Vertex*, double> &flows) {
+    vector<Vertex *> sub_vert;
+    if (root->outgoing.size() == 0) return make_pair(INFINITY, sub_vert);
     double cut_subtrees = 0;
+    double root_flow = flows[root];
     for (auto it : root->outgoing) {
         Vertex* child = it.second;
-        cut_subtrees += _cut_normalized_subtree(child, flows);
+        pair<double, vector<Vertex*> > sub_cut = _cut_normalized_subtree(child, flows);
+        cut_subtrees += sub_cut.first;
+        if (cut_subtrees > root_flow) break;
+        sub_vert.insert(sub_vert.end(), sub_cut.second.begin(), sub_cut.second.end());
     }
-    return min(cut_subtrees, flows[root]);
+    if (cut_subtrees < root_flow) {
+        return make_pair(cut_subtrees, sub_vert);
+    } else {
+        sub_vert.clear();
+        sub_vert.push_back(root);
+        return make_pair(root_flow, sub_vert);
+    }
 }
 
-double cut_normalized(Graph g) {
+pair<double, vector<Vertex*> > cut_normalized(Graph g) {
     for (auto it : g.vertices) {
         if (it.second->type == 0) {
             map<Vertex*, double> flows = g.getFlows();
@@ -297,7 +308,14 @@ int main(int argc, char** argv) {
         cout << (*flow.first) << ": " << flow.second << endl;
     }
     
-    cout << "Min cut: " << cut_normalized(normalized) << endl;
+    pair<double, vector<Vertex*> > cut = cut_normalized(normalized);
+    
+    cout << "Min cut weight: " << cut.first << endl;
+    cout << "Vertices in cut: ";
+    for (Vertex* v : cut.second) {
+        cout << (*v) << ", ";
+    }
+    cout << endl;
     
     return 0;
 }
