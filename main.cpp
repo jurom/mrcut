@@ -75,7 +75,7 @@ class Graph {
         double source_data;
         map<pair<int, int>, double> df_coef;
         map<long long, Vertex*> vertices;
-        Graph(int sdata, map<pair<int, int>, double> coef, map<long long, Vertex*> vert)
+        Graph(double sdata, map<pair<int, int>, double> coef, map<long long, Vertex*> vert)
             : source_data(sdata), df_coef(coef) {
             this->vertices = vert;
         }
@@ -218,7 +218,8 @@ int main(int argc, char** argv) {
     
     // Number of vertices
     int n;
-    cin >> n;
+    double sdata;
+    cin >> n >> sdata;
     
     map<int, Vertex*> type_to_vertex;
 
@@ -253,7 +254,7 @@ int main(int argc, char** argv) {
 //        cout << endl;
     }
     
-    Graph graph(1, df_coef, vertices);
+    Graph graph(sdata, df_coef, vertices);
     cout << graph << endl;
     Graph cpy = graph.copy();
     cout << "copied" << endl;
