@@ -57,11 +57,25 @@ ostream& operator<<(ostream &strm, const Vertex &v) {
 }
 
 class Graph {
+    private:
+        double compute_flow(Vertex* vertex, map<Vertex*, double> &flows) {
+            if (flows.find(vertex) != flows.end()) return flows[vertex];
+            double flow = 0;
+            if (vertex->type == 0) {
+                flow = this->source_data;
+            } else {
+                for (pair<long long, Vertex*> in_v : vertex->incoming) {
+                    flow += compute_flow(in_v.second, flows) * this->df_coef[make_pair(in_v.second->type, vertex->type)];
+                }
+            }
+            flows[vertex] = flow;
+            return flow;
+        }
     public:
         double source_data;
-        double **df_coef;
+        map<pair<int, int>, double> df_coef;
         map<long long, Vertex*> vertices;
-        Graph(int sdata, double **coef, map<long long, Vertex*> vert)
+        Graph(int sdata, map<pair<int, int>, double> coef, map<long long, Vertex*> vert)
             : source_data(sdata), df_coef(coef) {
             this->vertices = vert;
         }
@@ -79,6 +93,11 @@ class Graph {
                 }
                 ret += "\n";
             }
+            ret += "Dataflow coefficients: ";
+            for (auto it : this->df_coef) {
+                ret += std::to_string(it.first.first) + "->" + std::to_string(it.first.second) + ": " + std::to_string(it.second) + ", ";
+            }
+            ret += "\n";
             return ret;
         }
         Graph copy() {
@@ -102,6 +121,13 @@ class Graph {
             
             Graph result(this->source_data, this->df_coef, new_vertices);
             return result;
+        }
+        map<Vertex*, double> getFlows() {
+            map<Vertex*, double> flows;
+            for (pair<long long, Vertex*> it : this->vertices) {
+                compute_flow(it.second, flows);
+            }
+            return flows;
         }
         
 };
@@ -197,8 +223,7 @@ int main(int argc, char** argv) {
     map<int, Vertex*> type_to_vertex;
 
     // Dataflow coefficient for vertices
-    double **df_coef = new double*[n];
-    for (int i = 0; i < n; i++) df_coef[i] = new double[n];
+    map<pair<int, int>, double> df_coef;
     for (int i = 0; i < n-1; i++) {
         // Vertex index & number of incoming edges
         int v1, ve;
@@ -209,7 +234,7 @@ int main(int argc, char** argv) {
             double coef;
             // Vertex index of incoming edge & dataflow coefficient
             scanf("%d %lf", &v2, &coef);
-            df_coef[v1][v2] = coef;
+            df_coef[make_pair(v2, v1)] = coef;
             Vertex* vert2 = get_vert_of_type(v2, type_to_vertex);
             vert->incoming[vert2->id] = vert2;
             vert2->outgoing[vert->id] = vert;
@@ -240,8 +265,16 @@ int main(int argc, char** argv) {
     for (Vertex* v : sorted) cout << (*v) << ", ";
     cout << endl;
 
+    Graph normalized = normalize(graph);
     cout << "Normalized: " << endl;
-    cout << normalize(graph) << endl;
+    cout << normalized << endl;
+    
+    map<Vertex*, double> flows = normalized.getFlows();
+    
+    cout << "Flows: " << endl;
+    for (pair<Vertex*, double> flow : flows) {
+        cout << (*flow.first) << ": " << flow.second << endl;
+    }
     
     return 0;
 }
