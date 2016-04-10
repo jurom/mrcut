@@ -12,7 +12,9 @@
 #include <map>
 #include <set>
 #include <string>
+#include <math.h>
 
+#define min(a,b) a < b ? a : b;
 
 using namespace std;
 
@@ -213,6 +215,24 @@ Graph normalize(Graph g) {
     return graph;
 }
 
+double _cut_normalized_subtree(Vertex* root, map<Vertex*, double> &flows) {
+    if (root->outgoing.size() == 0) return INFINITY;
+    double cut_subtrees = 0;
+    for (auto it : root->outgoing) {
+        Vertex* child = it.second;
+        cut_subtrees += _cut_normalized_subtree(child, flows);
+    }
+    return min(cut_subtrees, flows[root]);
+}
+
+double cut_normalized(Graph g) {
+    for (auto it : g.vertices) {
+        if (it.second->type == 0) {
+            map<Vertex*, double> flows = g.getFlows();
+            return _cut_normalized_subtree(it.second, flows);
+        }
+    }
+}
 
 int main(int argc, char** argv) {
     
@@ -276,6 +296,8 @@ int main(int argc, char** argv) {
     for (pair<Vertex*, double> flow : flows) {
         cout << (*flow.first) << ": " << flow.second << endl;
     }
+    
+    cout << "Min cut: " << cut_normalized(normalized) << endl;
     
     return 0;
 }
