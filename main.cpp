@@ -192,7 +192,6 @@ Vertex* copy_subtree(Graph &g, Vertex* root) {
         new_root->outgoing[new_child->id] = new_child;
         new_child->incoming[new_root->id] = new_root;
     }
-    cout << "Adding " << (*new_root) << endl;
     g.vertices[new_root->id] = new_root;
     return new_root;
 }
@@ -201,7 +200,6 @@ Graph normalize(Graph g) {
     Graph graph = g.copy();
     vector <Vertex*> sorted = rev_top_sort(graph);
     for (Vertex* vertex : sorted) {
-        cout << (*vertex) << " has " << vertex->incoming.size() << endl; 
         if (vertex->incoming.size() > 1) {
             for (map<long long, Vertex*>::iterator it = vertex->incoming.begin(); ++it != vertex->incoming.end(); ) {
                 Vertex* parent = it->second;
@@ -277,29 +275,12 @@ int main(int argc, char** argv) {
     map<long long, Vertex*> vertices;
     for (auto elem : type_to_vertex) {
         vertices[elem.second->id] = elem.second;
-//        cout << (*elem.second) << endl;
-//        cout << "  Out: ";
-//        for (auto it : elem.second->outgoing) cout << (*it.second) << ", ";
-//        cout << endl << "  In: ";
-//        for (auto it : elem.second->incoming) cout << (*it.second) << ", ";
-//        cout << endl;
     }
     
     Graph graph(sdata, df_coef, vertices);
     cout << graph << endl;
-    Graph cpy = graph.copy();
-    cout << "copied" << endl;
-    cout << cpy << endl;
-    vector<Vertex*> sorted = rev_top_sort(cpy);
-    rev_top_sort(graph);
-    
-    cout << graph << endl;
-    for (Vertex* v : sorted) cout << (*v) << ", ";
-    cout << endl;
 
     Graph normalized = normalize(graph);
-    cout << "Normalized: " << endl;
-    cout << normalized << endl;
     
     map<Vertex*, double> flows = normalized.getFlows();
     
