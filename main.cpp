@@ -40,8 +40,28 @@ class Vertex {
             this->id = get_next_id();
         }
         Vertex(){}
+        virtual string to_string() =0;
+};
+
+class PD : public Vertex {
+    public:
+        int type;
+        long long id;
+        PD(int t, long long _id) : type(t), id(_id) {}
+        PD(int t) : type(t) {
+            this->id = get_next_id();
+        }
+        PD() {}
         string to_string() const {
-            return "[V" + std::to_string(this->type) + ", I" + std::to_string(this->id) + "]";
+            return "[PD " + std::to_string(this->type) + ", I" + std::to_string(this->id) + "]";
+        }
+};
+
+class GBK : public Vertex {
+    public:
+        
+        string to_string() const {
+            return "[GBK " + 
         }
 };
 
