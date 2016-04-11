@@ -13,6 +13,7 @@
 #include <set>
 #include <string>
 #include <math.h>
+#include <ctime>
 
 #define min(a,b) a < b ? a : b;
 
@@ -280,15 +281,10 @@ int main(int argc, char** argv) {
     Graph graph(sdata, df_coef, vertices);
     cout << graph << endl;
 
+    clock_t time;
+    time = clock();
     Graph normalized = normalize(graph);
-    
-    map<Vertex*, double> flows = normalized.getFlows();
-    
-    cout << "Flows: " << endl;
-    for (pair<Vertex*, double> flow : flows) {
-        cout << (*flow.first) << ": " << flow.second << endl;
-    }
-    
+
     pair<double, vector<Vertex*> > cut = cut_normalized(normalized);
     
     cout << "Min cut weight: " << cut.first << endl;
@@ -296,6 +292,7 @@ int main(int argc, char** argv) {
     for (Vertex* v : cut.second) {
         cout << (*v) << ", ";
     }
+    cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
     cout << endl;
     
     return 0;

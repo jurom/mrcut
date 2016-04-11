@@ -1,6 +1,9 @@
 *.out
+main
+gen
 .dep.inc
 build/
 dist/
 Makefile
 nbproject/
+inputs/
