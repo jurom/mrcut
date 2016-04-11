@@ -33,8 +33,8 @@ class Vertex {
     public:
         int type;
         long long id;
-        map<long long, Vertex*> incoming;
-        map<long long, Vertex*> outgoing;
+        set<Vertex*> incoming;
+        set<Vertex*> outgoing;
         Vertex(int t, long long _id) : type(t), id(_id) {}
         Vertex(int t) : type(t) {
             this->id = get_next_id();
@@ -45,15 +45,6 @@ class Vertex {
         }
 };
 
-bool operator<(const Vertex& left, const Vertex& other) {
-    return left.id < other.id;
-}
-bool operator>(const Vertex& left, const Vertex& other) {
-    return left.id > other.id;
-}
-bool operator==(const Vertex& left, const Vertex& other) {
-    return left.id == other.id;
-}
 ostream& operator<<(ostream &strm, const Vertex &v) {
     strm << v.to_string();
     return strm;
@@ -67,8 +58,8 @@ class Graph {
             if (vertex->type == 0) {
                 flow = this->source_data;
             } else {
-                for (pair<long long, Vertex*> in_v : vertex->incoming) {
-                    flow += compute_flow(in_v.second, flows) * this->df_coef[make_pair(in_v.second->type, vertex->type)];
+                for (Vertex* in_v : vertex->incoming) {
+                    flow += compute_flow(in_v, flows) * this->df_coef[make_pair(in_v->type, vertex->type)];
                 }
             }
             flows[vertex] = flow;
@@ -77,22 +68,22 @@ class Graph {
     public:
         double source_data;
         map<pair<int, int>, double> df_coef;
-        map<long long, Vertex*> vertices;
-        Graph(double sdata, map<pair<int, int>, double> coef, map<long long, Vertex*> vert)
+        set<Vertex*> vertices;
+        Graph(double sdata, map<pair<int, int>, double> coef, set<Vertex*> vert)
             : source_data(sdata), df_coef(coef) {
             this->vertices = vert;
         }
         string to_string() const {
             string ret = "Graph:\n";
-            for (auto it : this->vertices) {
-                ret += "  " + it.second->to_string() + ":";
+            for (Vertex* vertex : this->vertices) {
+                ret += "  " + vertex->to_string() + ":";
                 ret += "\n    Out: ";
-                for (auto out: it.second->outgoing) {
-                    ret += out.second->to_string() + ", ";
+                for (Vertex* out: vertex->outgoing) {
+                    ret += out->to_string() + ", ";
                 }
                 ret += "\n    In:  ";
-                for (auto in: it.second->incoming) {
-                    ret += in.second->to_string() + ", ";
+                for (Vertex* in: vertex->incoming) {
+                    ret += in->to_string() + ", ";
                 }
                 ret += "\n";
             }
@@ -104,21 +95,22 @@ class Graph {
             return ret;
         }
         Graph copy() {
-            map<long long, Vertex*> new_vertices;
+            map<Vertex*, Vertex*> copies;
+            set<Vertex*> new_vertices;
             // Create a copy of each vertex
-            for (pair<long long, Vertex*> it : this->vertices) {
-                Vertex* new_v = new Vertex(it.second->type, it.first);
-                new_vertices[it.first] = new_v;
+            for (Vertex* v : this->vertices) {
+                Vertex* new_v = new Vertex(v->type, v->id);
+                copies[v] = new_v;
+                new_vertices.insert(new_v);
             }
             // Assign incoming and outgoing edges
-            for (pair<long long, Vertex*> it : this->vertices) {
-                Vertex* v = it.second;
-                Vertex* new_v = new_vertices[v->id];
-                for (pair<long long, Vertex*> itv : v->incoming) {
-                    new_v->incoming[itv.first] = new_vertices[itv.first];
+            for (Vertex* v : this->vertices) {
+                Vertex* new_v = copies[v];
+                for (Vertex* in_v : v->incoming) {
+                    new_v->incoming.insert(copies[in_v]);
                 }
-                for (pair<long long, Vertex*> itv : v->outgoing) {
-                    new_v->outgoing[itv.first] = new_vertices[itv.first];
+                for (Vertex* out_v : v->outgoing) {
+                    new_v->outgoing.insert(copies[out_v]);
                 }
             }
             
@@ -127,8 +119,8 @@ class Graph {
         }
         map<Vertex*, double> getFlows() {
             map<Vertex*, double> flows;
-            for (pair<long long, Vertex*> it : this->vertices) {
-                compute_flow(it.second, flows);
+            for (Vertex* vertex : this->vertices) {
+                compute_flow(vertex, flows);
             }
             return flows;
         }
@@ -144,7 +136,8 @@ Vertex* get_vert_of_type(int type, map<int, Vertex*> &type_to_vertex) {
     if (type_to_vertex.find(type) == type_to_vertex.end()) {
         Vertex* vert = new Vertex(type);
         type_to_vertex[type] = vert;
-    }return type_to_vertex[type];
+    }
+    return type_to_vertex[type];
 }
 
 vector<Vertex*> rev_top_sort(Graph g) {
@@ -153,32 +146,32 @@ vector<Vertex*> rev_top_sort(Graph g) {
         return sorted;
     }
     Vertex* to_remove = NULL;
-    for (pair<long long, Vertex*> it : g.vertices) {
-        if (it.second->incoming.size() == 0) {
-            to_remove = it.second;
+    for (Vertex* vertex : g.vertices) {
+        if (vertex->incoming.size() == 0) {
+            to_remove = vertex;
             break;
         }
     }
     if (to_remove == NULL) {
         cout << "There are no vertices without incoming edges ! " << endl;
     }
-    for (auto it : to_remove->outgoing) {
-        it.second->incoming.erase(to_remove->id);
+    for (Vertex* out_v : to_remove->outgoing) {
+        out_v->incoming.erase(to_remove);
     }
-    for (auto it : to_remove->incoming) {
-        it.second->outgoing.erase(to_remove->id);
+    for (Vertex* in_v : to_remove->incoming) {
+        in_v->outgoing.erase(to_remove);
     }
-    g.vertices.erase(to_remove->id);
+    g.vertices.erase(to_remove);
     sorted = rev_top_sort(g);
     sorted.push_back(to_remove);
     
     // Rollback changes to graph
-    g.vertices[to_remove->id] = to_remove;
-    for (auto it : to_remove->outgoing) {
-        it.second->incoming[to_remove->id] = to_remove;
+    g.vertices.insert(to_remove);
+    for (Vertex* out_v : to_remove->outgoing) {
+        out_v->incoming.insert(to_remove);
     }
-    for (auto it : to_remove->incoming) {
-        it.second->outgoing[to_remove->id] = to_remove;
+    for (Vertex* in_v : to_remove->incoming) {
+        in_v->outgoing.insert(to_remove);
     }
 
     return sorted;
@@ -187,13 +180,12 @@ vector<Vertex*> rev_top_sort(Graph g) {
 Vertex* copy_subtree(Graph &g, Vertex* root) {
     Vertex* new_root = new Vertex(root->type);
     
-    for (auto it : root->outgoing) {
-        Vertex* child = it.second;
+    for (Vertex* child : root->outgoing) {
         Vertex* new_child = copy_subtree(g, child);
-        new_root->outgoing[new_child->id] = new_child;
-        new_child->incoming[new_root->id] = new_root;
+        new_root->outgoing.insert(new_child);
+        new_child->incoming.insert(new_root);
     }
-    g.vertices[new_root->id] = new_root;
+    g.vertices.insert(new_root);
     return new_root;
 }
 
@@ -202,25 +194,24 @@ Graph normalize(Graph g) {
     vector <Vertex*> sorted = rev_top_sort(graph);
     for (Vertex* vertex : sorted) {
         if (vertex->incoming.size() > 1) {
-            for (map<long long, Vertex*>::iterator it = vertex->incoming.begin(); ++it != vertex->incoming.end(); ) {
-                Vertex* parent = it->second;
+            for (set<Vertex*>::iterator it = vertex->incoming.begin(); ++it != vertex->incoming.end(); ) {
+                Vertex* parent = *it;
                 Vertex* new_subtree = copy_subtree(graph, vertex);
-                new_subtree->incoming[parent->id] = parent;
-                parent->outgoing.erase(vertex->id);
-                parent->outgoing[new_subtree->id] = new_subtree;
+                new_subtree->incoming.insert(parent);
+                parent->outgoing.erase(vertex);
+                parent->outgoing.insert(new_subtree);
             }
         }
     }
     return graph;
 }
 
-pair<double, vector<Vertex*>> _cut_normalized_subtree(Vertex* root, map<Vertex*, double> &flows) {
+pair<double, vector<Vertex*> > _cut_normalized_subtree(Vertex* root, map<Vertex*, double> &flows) {
     vector<Vertex *> sub_vert;
     if (root->outgoing.size() == 0) return make_pair(INFINITY, sub_vert);
     double cut_subtrees = 0;
     double root_flow = flows[root];
-    for (auto it : root->outgoing) {
-        Vertex* child = it.second;
+    for (Vertex* child : root->outgoing) {
         pair<double, vector<Vertex*> > sub_cut = _cut_normalized_subtree(child, flows);
         cut_subtrees += sub_cut.first;
         if (cut_subtrees > root_flow) break;
@@ -236,10 +227,10 @@ pair<double, vector<Vertex*>> _cut_normalized_subtree(Vertex* root, map<Vertex*,
 }
 
 pair<double, vector<Vertex*> > cut_normalized(Graph g) {
-    for (auto it : g.vertices) {
-        if (it.second->type == 0) {
+    for (Vertex* vertex : g.vertices) {
+        if (vertex->type == 0) {
             map<Vertex*, double> flows = g.getFlows();
-            return _cut_normalized_subtree(it.second, flows);
+            return _cut_normalized_subtree(vertex, flows);
         }
     }
 }
@@ -267,15 +258,15 @@ int main(int argc, char** argv) {
             scanf("%d %lf", &v2, &coef);
             df_coef[make_pair(v2, v1)] = coef;
             Vertex* vert2 = get_vert_of_type(v2, type_to_vertex);
-            vert->incoming[vert2->id] = vert2;
-            vert2->outgoing[vert->id] = vert;
+            vert->incoming.insert(vert2);
+            vert2->outgoing.insert(vert);
         }
     }
     
     // First vertex has all outgoing edges, last all incoming
-    map<long long, Vertex*> vertices;
+    set<Vertex*> vertices;
     for (auto elem : type_to_vertex) {
-        vertices[elem.second->id] = elem.second;
+        vertices.insert(elem.second);
     }
     
     Graph graph(sdata, df_coef, vertices);
