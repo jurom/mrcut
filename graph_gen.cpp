@@ -61,25 +61,33 @@ double rand_df_coef(int max_factor, double prob_of_small) {
     return (should_invert ? 1/on_interval : on_interval);
 }
 
-// FIXME !!
-string gen_rand_entwined(int height, int width, int sdata, int max_factor, double prob_of_small) {
-    string ret = std::to_string((height + 1)*2 + 2);
-    ret += " " + std::to_string(sdata) + "\n";
-    ret += "I -1 0\n";
-    ret += "G 0 1\n";
-    ret += "I -1 1";
+RegGraph gen_rand_entwined(int height, int width, int sdata, int max_factor, double prob_of_small) {
+    Vertex* input = new Vertex(0, "I");
+    Vertex* source = new Vertex(1, "G");
+    vector<Vertex*> vertices;
+    input->outgoing.insert(make_pair(source, 1));
+    source->incoming.insert(make_pair(input, 1));
+    vertices.push_back(input);
+    vertices.push_back(source);
     for (int i = 0; i <= height; i++) {
-        for (int current_vert = i*width+1; (current_vert <= (i+1)*width) && (current_vert <= height*width+1); current_vert++) {
-            ret += std::to_string(current_vert) + " " + (i > 0 ? std::to_string(width) : "1") + "\n";
-            for (int prev_vert = i*width; (prev_vert >= 0) && (prev_vert >= (i-1)*width+1); prev_vert--) {
+        for (int current_vert = i*width+2; (current_vert < (i+1)*width+2) && (current_vert <= height*width+2); current_vert++) {
+            Vertex* vertex = new Vertex(current_vert, current_vert == height*width+2 ? "G" : "P");
+            vertices.push_back(vertex);
+            for (int prev_vert = i*width+1; (prev_vert >= 1) && (prev_vert > (i-1)*width+1); prev_vert--) {
                 double df_coef = rand_df_coef(max_factor, prob_of_small);
-                ret += "P " + std::to_string(prev_vert) + " " + std::to_string(df_coef) + "\n";
+                vertex->incoming.insert(make_pair(vertices[prev_vert], df_coef));
+                vertices[prev_vert]->outgoing.insert(make_pair(vertex, df_coef));
             }
         }
     }
-    ret += "O 0 1\n";
-    ret += "G " + std::to_string(height*2 + 1) + " 1\n";
-    return ret;
+    Vertex* output = new Vertex(height*width+3, "O");
+    output->incoming.insert(make_pair(vertices[height*width+2], 1));
+    vertices[height*width+2]->outgoing.insert(make_pair(output, 1));
+    vertices.push_back(output);
+    set<Vertex*> vertices_set;
+    for (Vertex* v : vertices) vertices_set.insert(v);
+    RegGraph rg(sdata, vertices_set);
+    return rg;
 }
 
 Vertex* get_vert_of_type(int type, map<int, Vertex*> &type_to_vert) {
@@ -147,7 +155,7 @@ int main(int argc, char** argv) {
         int height, width, sdata, max_factor;
         double prob_of_small;
         cin >> height >> width >> sdata >> max_factor >> prob_of_small;
-        cout << gen_rand_entwined(height, width, sdata, max_factor, prob_of_small);
+        cout << gen_rand_entwined(height, width, sdata, max_factor, prob_of_small).to_string();
     } else if(type == "dag") {
         int num_vertices, sdata, max_factor, num_gbk;
         double edge_prob, prob_of_small;
