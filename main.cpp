@@ -310,17 +310,24 @@ pair<double, bool> _compute_opt_vertex(Vertex* vertex, map<Vertex*, pair<double,
     } else return cuts[vertex];
 }
 
-Vertex* induced_by_cut(Vertex* root, map<Vertex*, pair<double, bool > > &cuts) {
+Vertex* _induced_by_cut(Vertex* root, map<Vertex*, pair<double, bool > > &cuts, map<int, Vertex*> &type_to_vertex) {
+    if (type_to_vertex.find(root->type) != type_to_vertex.end()) return type_to_vertex[root->type];
     pair<double, bool> cut = cuts[root];
     Vertex* new_root = copy_vertex(root);
     if (cut.second) {
         for (Vertex* child : root->outgoing) {
-            Vertex* new_child = induced_by_cut(child, cuts);
+            Vertex* new_child = _induced_by_cut(child, cuts, type_to_vertex);
             new_root->outgoing.insert(new_child);
             new_child->incoming.insert(new_root);
         }
     }
+    type_to_vertex[new_root->type] = new_root;
     return new_root;
+}
+
+Vertex* induced_by_cut(Vertex* root, map<Vertex*, pair<double, bool > > &cuts) {
+    map<int, Vertex*> type_to_vertex;
+    return _induced_by_cut(root, cuts, type_to_vertex);
 }
 
 double compute_flow(Vertex* vertex, map<pair<int, int>, double> &df_coef, map<Vertex*, double> &flows) {
@@ -333,13 +340,17 @@ double compute_flow(Vertex* vertex, map<pair<int, int>, double> &df_coef, map<Ve
     return flow;
 }
 
+void _vertices_of_root(Vertex* root, set<Vertex*> &vertices) {
+    if (vertices.find(root) != vertices.end()) return;
+    vertices.insert(root);
+    for (Vertex* child : root->outgoing) {
+        _vertices_of_root(child, vertices);
+    }
+}
+
 set<Vertex*> vertices_of_root(Vertex* root) {
     set<Vertex*> res;
-    res.insert(root);
-    for (Vertex* child : root->outgoing) {
-        set<Vertex*> vert_of_child = vertices_of_root(child);
-        res.insert(vert_of_child.begin(), vert_of_child.end());
-    }
+    _vertices_of_root(root, res);
     return res;
 }
 
@@ -366,7 +377,7 @@ vector<pair<Vertex*, vector<pair<Vertex*, double> > > > find_cut_vertices(Graph 
     return result;
 }
 
-double compute_opt(Graph g) {
+pair<double, vector<pair<Vertex*, vector<pair<Vertex*, double> > > > > compute_opt(Graph g) {
     map<Vertex*, pair<double, bool > > cuts;
     
     map<Vertex*, double> flows = g.getFlows();
@@ -378,16 +389,7 @@ double compute_opt(Graph g) {
             total_price += opt_vert.first * flows[gbk];
         }
     }
-    cout << "Cut vertices" << endl;
-    vector<pair<Vertex*, vector<pair<Vertex*, double> > > >  cut_vertices = find_cut_vertices(g, cuts);
-    for (auto it : cut_vertices) {
-        cout << it.first << ": ";
-        for (auto v : it.second) {
-            cout << "(" << v.first << ", " << v.second << "), ";
-        }
-        cout << endl;
-    }
-    return total_price;
+    return make_pair(total_price, find_cut_vertices(g, cuts));
 }
 
 pair<double, vector<Vertex*> > _cut_from_gbk_under_vert(Vertex* root, map<Vertex*, double> &flows);
@@ -433,6 +435,41 @@ pair<double, vector<Vertex*> > cut_normalized(Graph g) {
     return make_pair(cut_cost, cut_vertices);
 }
 
+double naive_cut(Graph g) {
+    double res = 0;
+    map<Vertex*, double> flows;
+    map<Vertex*, double> orig_flows = g.getFlows();
+    map<Vertex*, pair<double, bool> > cuts;
+    for (Vertex* v : g.vertices) {
+        bool has_gbkout = false;
+        for (Vertex* out : v->outgoing) {
+            if (is_GBK(out)) {
+                has_gbkout = true;
+                break;
+            }
+        }
+        cuts[v] = make_pair(1, !has_gbkout);
+    }
+    
+    double total_price = 0;
+    
+    for (Vertex* gbk : g.vertices) {
+        if (is_GBK(gbk)) {
+            double child_price = 0;
+            Vertex* new_gbk = induced_by_cut(gbk, cuts);
+            flows[new_gbk] = orig_flows[gbk];
+            set<Vertex*> vertices = vertices_of_root(new_gbk);
+            for (Vertex* v : vertices) {
+                if ((v->outgoing.size() == 0) && (!is_Output(v))) {
+                    child_price += compute_flow(v, g.df_coef, flows);
+                }
+            }
+            total_price += min(child_price, flows[new_gbk]); 
+        }
+    }
+    return total_price;
+}
+
 int main(int argc, char** argv) {
     
     // Number of vertices
@@ -470,6 +507,14 @@ int main(int argc, char** argv) {
     }
     
     Graph graph(sdata, df_coef, vertices);
+    
+    if (argc > 1) {
+        double opt = compute_opt(graph).first;
+        double naive = naive_cut(graph);
+        cout << opt << " " << naive << " " << naive/opt << endl;
+        return 0;
+    }
+    
     cout << graph << endl;
 
     clock_t time;
@@ -493,10 +538,27 @@ int main(int argc, char** argv) {
 //    cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
 //    cout << endl;
 //    
+    
     cout << "Starting linear alg" << endl;
     time = clock();
-    cout << "Min cut weight: " << compute_opt(graph) << endl;
+    
+    pair<double, vector<pair<Vertex*, vector<pair<Vertex*, double> > > > > lin_opt = compute_opt(graph);
+    
+    cout << "Min cut weight: " << lin_opt.first << endl;
+    cout << "Cut vertices" << endl;
+    
+    for (auto it : lin_opt.second) {
+        cout << it.first << ": ";
+        for (auto v : it.second) {
+            cout << "(" << v.first << ", " << v.second << "), ";
+        }
+        cout << endl;
+    }
+    
+    
     cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
+    
+    cout << "Naive cut: " << naive_cut(graph) << endl;
     
     return 0;
 }
