@@ -109,15 +109,14 @@ RegGraph gen_rand_dag(int num_vert, int num_gbks, int sdata, double edge_prob, d
     vector<Vertex*> type_to_vert;
     Vertex* input = new Vertex(0, "I");
     type_to_vert.push_back(input);
-    int step = num_vert/num_gbks;
     for (int i = 1; i <= num_vert; i++) {
-        Vertex* vert = NULL;
-        if ((i + step/2)%step == 0) {
-            vert = new Vertex(i, "G");
-        } else {
-            vert = new Vertex(i, "P");
-        }
+        Vertex* vert = new Vertex(i, "P");
         type_to_vert.push_back(vert);
+    }
+    double step = ((double)num_vert)/num_gbks;
+    for (double i = step/2 + 1; i < type_to_vert.size(); i+= step) {
+        type_to_vert[i] = new Vertex(i, "G");
+        
     }
     Vertex* output = new Vertex(num_vert+1, "O");
     type_to_vert.push_back(output);
