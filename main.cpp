@@ -98,11 +98,15 @@ bool is_Output(Vertex* vert) {
     return output != 0;
 }
 
-Vertex* copy_vertex(Vertex* v) {
-    if (is_PD(v)) return new PD(v->type);
-    if (is_GBK(v)) return new GBK(v->type);
+Vertex* copy_vertex(Vertex* v, long long id) {
+    if (is_PD(v)) return new PD(v->type, id);
+    if (is_GBK(v)) return new GBK(v->type, id);
     if (is_Input(v)) return new Input(v->type);
     if (is_Output(v)) return new Output(v->type);
+}
+
+Vertex* copy_vertex(Vertex* v) {
+    return copy_vertex(v, get_next_id());
 }
 
 ostream& operator<<(ostream &strm, const Vertex* v) {
@@ -199,7 +203,6 @@ Vertex* get_vert_of_type(string vtype, int type, map<pair<string, int>, Vertex*>
         if (vtype == "P") vert = new PD(type);
         if (vtype == "I") vert = new Input(type);
         if (vtype == "O") vert = new Output(type);
-        cout << "Is input " << is_Input(vert) << endl;
         type_to_vertex[make_pair(vtype, type)] = vert;
     }
     return type_to_vertex[make_pair(vtype, type)];
@@ -246,8 +249,9 @@ vector<Vertex*> rev_top_sort(Graph g) {
  * Copy subtree rooted in [root]
  */
 Vertex* copy_subtree(Graph &g, Vertex* root) {
+    if (is_GBK(root) || is_Output(root)) return root; 
     Vertex* new_root = copy_vertex(root);
-    
+
     set<Vertex*> out_to_add;
     for (Vertex* child : root->outgoing) {
         Vertex* new_child = copy_subtree(g, child);
@@ -266,6 +270,7 @@ Graph normalize(Graph g) {
     clock_t time = clock();
     for (Vertex* vertex : sorted) {
         // Split only PD vertices
+        if (is_GBK(vertex) || is_Output(vertex)) continue;
         while (vertex->incoming.size() > 1) {
             Vertex* parent = *vertex->incoming.begin();
             vertex->incoming.erase(parent);
@@ -273,29 +278,6 @@ Graph normalize(Graph g) {
             new_subtree->incoming.insert(parent);
             parent->outgoing.erase(vertex);
             parent->outgoing.insert(new_subtree);
-        }
-    }
-    map<pair<string, int>, vector<Vertex*>> vert_by_type;
-    for (Vertex* vertex : graph.vertices) {
-        if (is_GBK(vertex)) vert_by_type[make_pair("G", vertex->type)].push_back(vertex);
-        if (is_Output(vertex)) vert_by_type[make_pair("O", vertex->type)].push_back(vertex);
-    }
-    for (auto it : vert_by_type) {
-        cout << it.first.first << " " << it.first.second << ": " << it.second.size() << endl;
-        Vertex* vertex = it.second[0];
-        for (int i = 1; i < it.second.size(); i++) {
-            Vertex* copy = it.second[i];
-            for (Vertex* parent : copy->incoming) {
-                parent->outgoing.erase(copy);
-                parent->outgoing.insert(vertex);
-                vertex->incoming.insert(parent);
-            }
-            for (Vertex* child : copy->outgoing) {
-                child->incoming.erase(copy);
-                child->incoming.insert(vertex);
-                vertex->outgoing.insert(child);
-            }
-            graph.vertices.erase(copy);
         }
     }
     
@@ -328,6 +310,62 @@ pair<double, bool> _compute_opt_vertex(Vertex* vertex, map<Vertex*, pair<double,
     } else return cuts[vertex];
 }
 
+Vertex* induced_by_cut(Vertex* root, map<Vertex*, pair<double, bool > > &cuts) {
+    pair<double, bool> cut = cuts[root];
+    Vertex* new_root = copy_vertex(root);
+    if (cut.second) {
+        for (Vertex* child : root->outgoing) {
+            Vertex* new_child = induced_by_cut(child, cuts);
+            new_root->outgoing.insert(new_child);
+            new_child->incoming.insert(new_root);
+        }
+    }
+    return new_root;
+}
+
+double compute_flow(Vertex* vertex, map<pair<int, int>, double> &df_coef, map<Vertex*, double> &flows) {
+    if (flows.find(vertex) != flows.end()) return flows[vertex];
+    double flow = 0;
+    for (Vertex* inc : vertex->incoming) {
+        flow += compute_flow(inc, df_coef, flows) * df_coef[make_pair(inc->type, vertex->type)];
+    }
+    flows[vertex] = flow;
+    return flow;
+}
+
+set<Vertex*> vertices_of_root(Vertex* root) {
+    set<Vertex*> res;
+    res.insert(root);
+    for (Vertex* child : root->outgoing) {
+        set<Vertex*> vert_of_child = vertices_of_root(child);
+        res.insert(vert_of_child.begin(), vert_of_child.end());
+    }
+    return res;
+}
+
+vector<pair<Vertex*, vector<pair<Vertex*, double> > > > find_cut_vertices(Graph g, map<Vertex*, pair<double, bool > > &cuts) {
+    map<Vertex*, Vertex*> copies;
+    map<Vertex*, double> flows;
+    map<Vertex*, double> orig_flows = g.getFlows();
+    vector<pair<Vertex*, vector<pair<Vertex*, double> > > > result;
+    for (Vertex* gbk : g.vertices) {
+        if (is_GBK(gbk)) {
+            Vertex* new_gbk = induced_by_cut(gbk, cuts);
+            flows[new_gbk] = orig_flows[gbk];
+            set<Vertex*> vertices = vertices_of_root(new_gbk);
+            vector<pair<Vertex*, double > > cut_vertices;
+            for (Vertex* vert : vertices) {
+                double vert_flow = compute_flow(vert, g.df_coef, flows);
+                if ((vert->outgoing.size() == 0) && (!is_Output(vert))) {
+                    cut_vertices.push_back(make_pair(vert, vert_flow));
+                }
+            }
+            result.push_back(make_pair(gbk, cut_vertices));
+        }
+    }
+    return result;
+}
+
 double compute_opt(Graph g) {
     map<Vertex*, pair<double, bool > > cuts;
     
@@ -340,9 +378,14 @@ double compute_opt(Graph g) {
             total_price += opt_vert.first * flows[gbk];
         }
     }
-    cout << "DEBUG: prices" << endl;
-    for (auto it : cuts) {
-        cout << it.first << ": " << it.second.first << endl;
+    cout << "Cut vertices" << endl;
+    vector<pair<Vertex*, vector<pair<Vertex*, double> > > >  cut_vertices = find_cut_vertices(g, cuts);
+    for (auto it : cut_vertices) {
+        cout << it.first << ": ";
+        for (auto v : it.second) {
+            cout << "(" << v.first << ", " << v.second << "), ";
+        }
+        cout << endl;
     }
     return total_price;
 }
@@ -432,13 +475,13 @@ int main(int argc, char** argv) {
     clock_t time;
     time = clock();
     Graph normalized = normalize(graph);
-    cout << "Normalized: " << endl;
-    cout << normalized << endl;
-
-    cout << "Flows: ";
-    for (auto fl : normalized.getFlows()) {
-        cout << fl.first << ": " << fl.second << endl;
-    }
+//    cout << "Normalized: " << endl;
+//    cout << normalized << endl;
+//
+//    cout << "Flows: ";
+//    for (auto fl : normalized.getFlows()) {
+//        cout << fl.first << ": " << fl.second << endl;
+//    }
 
     pair<double, vector<Vertex*> > cut = cut_normalized(normalized);
     
