@@ -473,8 +473,8 @@ int main(int argc, char** argv) {
     cout << graph << endl;
 
     clock_t time;
-    time = clock();
-    Graph normalized = normalize(graph);
+//    time = clock();
+//    Graph normalized = normalize(graph);
 //    cout << "Normalized: " << endl;
 //    cout << normalized << endl;
 //
@@ -482,26 +482,21 @@ int main(int argc, char** argv) {
 //    for (auto fl : normalized.getFlows()) {
 //        cout << fl.first << ": " << fl.second << endl;
 //    }
-
-    pair<double, vector<Vertex*> > cut = cut_normalized(normalized);
-    
-    cout << "Min cut weight: " << cut.first << endl;
-    cout << "Vertices in cut: ";
-    for (Vertex* v : cut.second) {
-        cout << v << ", ";
-    }
-    cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
-    cout << endl;
-    
+//
+//    pair<double, vector<Vertex*> > cut = cut_normalized(normalized);
+//    
+//    cout << "Min cut weight: " << cut.first << endl;
+//    cout << "Vertices in cut: ";
+//    for (Vertex* v : cut.second) {
+//        cout << v << ", ";
+//    }
+//    cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
+//    cout << endl;
+//    
     cout << "Starting linear alg" << endl;
     time = clock();
     cout << "Min cut weight: " << compute_opt(graph) << endl;
     cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
-    
-    cout << "Flows: ";
-    for (auto fl : graph.getFlows()) {
-        cout << fl.first << ": " << fl.second << endl;
-    }
     
     return 0;
 }
