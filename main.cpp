@@ -266,14 +266,13 @@ Graph normalize(Graph g) {
     clock_t time = clock();
     for (Vertex* vertex : sorted) {
         // Split only PD vertices
-        if (vertex->incoming.size() > 1) {
-            for (set<Vertex*>::iterator it = vertex->incoming.begin(); ++it != vertex->incoming.end(); ) {
-                Vertex* parent = *it;
-                Vertex* new_subtree = copy_subtree(graph, vertex);
-                new_subtree->incoming.insert(parent);
-                parent->outgoing.erase(vertex);
-                parent->outgoing.insert(new_subtree);
-            }
+        while (vertex->incoming.size() > 1) {
+            Vertex* parent = *vertex->incoming.begin();
+            vertex->incoming.erase(parent);
+            Vertex* new_subtree = copy_subtree(graph, vertex);
+            new_subtree->incoming.insert(parent);
+            parent->outgoing.erase(vertex);
+            parent->outgoing.insert(new_subtree);
         }
     }
     map<pair<string, int>, vector<Vertex*>> vert_by_type;
@@ -303,6 +302,51 @@ Graph normalize(Graph g) {
     cout << "Normalize done, took " << (clock() - time)/(CLOCKS_PER_SEC/1000) << "ms" << endl;
     return graph;
 }
+
+pair<double, bool> _compute_opt_vertex(Vertex* vertex, map<Vertex*, pair<double, bool > > &cuts,
+        map< pair<int, int>, double> &df_coef) {
+    if (cuts.find(vertex) == cuts.end()) {
+        double total_price = 0;
+        for (Vertex* child : vertex->outgoing) {
+            if (is_GBK(child)) {
+                total_price = INFINITY;
+                break;
+            } else if (is_Output(child)) {
+                continue;
+            }
+            pair<double, bool> child_cost = _compute_opt_vertex(child, cuts, df_coef);
+            total_price += child_cost.first * df_coef[make_pair(vertex->type, child->type)];
+        }
+        pair<double, bool> result;
+        if (total_price < 1) {
+            result = make_pair(total_price, true);
+        } else {
+            result = make_pair(1, false);
+        }
+        cuts[vertex] = result;
+        return result;
+    } else return cuts[vertex];
+}
+
+double compute_opt(Graph g) {
+    map<Vertex*, pair<double, bool > > cuts;
+    
+    map<Vertex*, double> flows = g.getFlows();
+    double total_price = 0;
+    vector<Vertex*> separators;
+    for (Vertex* gbk : g.vertices) {
+        if (is_GBK(gbk)) {
+            pair<double, bool> opt_vert = _compute_opt_vertex(gbk, cuts, g.df_coef);
+            total_price += opt_vert.first * flows[gbk];
+        }
+    }
+    cout << "DEBUG: prices" << endl;
+    for (auto it : cuts) {
+        cout << it.first << ": " << it.second.first << endl;
+    }
+    return total_price;
+}
+
 pair<double, vector<Vertex*> > _cut_from_gbk_under_vert(Vertex* root, map<Vertex*, double> &flows);
 
 pair<double, vector<Vertex*> > _cut_vert_from_gbk(Vertex* root, map<Vertex*, double> &flows) {
@@ -388,12 +432,16 @@ int main(int argc, char** argv) {
     clock_t time;
     time = clock();
     Graph normalized = normalize(graph);
+    cout << "Normalized: " << endl;
+    cout << normalized << endl;
+
+    cout << "Flows: ";
+    for (auto fl : normalized.getFlows()) {
+        cout << fl.first << ": " << fl.second << endl;
+    }
 
     pair<double, vector<Vertex*> > cut = cut_normalized(normalized);
-//    cout << "Flows: " << endl;
-//    for (auto it : normalized.getFlows()) {
-//        cout << it.first << ": " << it.second << endl;
-//    }
+    
     cout << "Min cut weight: " << cut.first << endl;
     cout << "Vertices in cut: ";
     for (Vertex* v : cut.second) {
@@ -401,6 +449,16 @@ int main(int argc, char** argv) {
     }
     cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
     cout << endl;
+    
+    cout << "Starting linear alg" << endl;
+    time = clock();
+    cout << "Min cut weight: " << compute_opt(graph) << endl;
+    cout << "Took: " << (double)((clock() - time)/(CLOCKS_PER_SEC/1000)) << "ms" << endl;
+    
+    cout << "Flows: ";
+    for (auto fl : graph.getFlows()) {
+        cout << fl.first << ": " << fl.second << endl;
+    }
     
     return 0;
 }
